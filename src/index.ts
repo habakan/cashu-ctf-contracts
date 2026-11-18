@@ -335,6 +335,14 @@ function dataAt(raw: unknown, pointer: string): unknown {
     .reduce<unknown>((v, k) => (v as Record<string, unknown> | undefined)?.[k], raw);
 }
 
+/** Line and column of the node at path, for applications that add their own checks */
+export function locate(text: string, path: (string | number)[]): { line: number; column: number } {
+  const lines = new LineCounter();
+  const doc = parseDocument(text, { lineCounter: lines });
+  const pos = lines.linePos(offsetOf(doc, path));
+  return { line: pos.line, column: pos.col };
+}
+
 /** Start of the node at path, or of the closest parent that exists */
 function offsetOf(doc: ReturnType<typeof parseDocument>, path: Path): number {
   for (let n = path.length; n >= 0; n -= 1) {

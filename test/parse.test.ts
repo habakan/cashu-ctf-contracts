@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { Ajv } from "ajv";
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
-import { conditionId, occurrenceId, type ParseError, parse, schema, stringify } from "../src/index.js";
+import {
+  conditionId,
+  locate,
+  occurrenceId,
+  type ParseError,
+  parse,
+  schema,
+  stringify,
+} from "../src/index.js";
 
 const example = (name: string) => readFileSync(new URL(`examples/${name}.yaml`, import.meta.url), "utf8");
 const errorsOf = (text: string): ParseError[] => {
@@ -179,5 +187,12 @@ contracts:`,
       code: "unknown_party",
       subject: "dad",
     });
+  });
+});
+
+describe("locate", () => {
+  it("パスの位置を返し、無いパスは近い親の位置を返す", () => {
+    expect(locate(base, ["contracts", 0, "settle"])).toEqual({ line: 16, column: 5 });
+    expect(locate(base, ["contracts", 0, "nothing"])).toEqual({ line: 14, column: 5 });
   });
 });
