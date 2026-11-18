@@ -11,6 +11,7 @@ import {
   parse,
   schema,
   stringify,
+  toDocument,
 } from "../src/index.js";
 
 const example = (name: string) => readFileSync(new URL(`examples/${name}.yaml`, import.meta.url), "utf8");
@@ -81,6 +82,14 @@ describe("parse", () => {
       expect(again).toEqual(first);
     }
   });
+
+  it("reads the JSON of toDocument back to the same value", () => {
+    for (const name of ["yubikiri", "market"]) {
+      const first = parse(example(name));
+      if (!first.ok) throw new Error(name);
+      expect(parse(JSON.stringify(toDocument(first.value)))).toEqual(first);
+    }
+  });
 });
 
 describe("parse errors", () => {
@@ -107,7 +116,7 @@ describe("parse errors", () => {
       expect(first?.message).toMatch(message);
     });
 
-  it("rejects an event in two contracts and a second " * "", () => {
+  it('rejects an event in two contracts and a second "*"', () => {
     const twice = `${base}  - event: wake\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n`;
     expect(errorsOf(twice)[0]).toMatchObject({ line: 17, message: expect.stringMatching(/wake/) });
     const stars = `${base}  - event: "*"\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n  - event: "*"\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n`;
@@ -177,7 +186,7 @@ contracts:`,
     expect(parse(stringify(result.value))).toEqual(result);
   });
 
-  it("rejects " * " in a list and overlapping events with a code and the name", () => {
+  it('rejects "*" in a list and overlapping events with a code and the name', () => {
     expect(errorsOf(two.replace("- event: wake", '- event: [wake, "*"]'))[0]).toMatchObject({
       code: "catch_all_in_list",
       subject: "*",

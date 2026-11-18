@@ -408,8 +408,9 @@ function complete(raw: Raw): Contracts {
   };
 }
 
-export function stringify(value: Contracts): string {
-  return toYaml({
+/** The plain document that matches schema.json. Its JSON is also valid input to parse, since YAML 1.2 reads JSON. */
+export function toDocument(value: Contracts): Record<string, unknown> {
+  return {
     ...value,
     contracts: value.contracts.map((c) => ({
       event: c.event,
@@ -423,5 +424,7 @@ export function stringify(value: Contracts): string {
       settle: c.settle,
     })),
     limits: value.limits.per_day ? { per_day: amountText(value.limits.per_day) } : {},
-  });
+  };
 }
+
+export const stringify = (value: Contracts): string => toYaml(toDocument(value));

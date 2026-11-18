@@ -26,3 +26,6 @@ contracts:
 ```
 
 Status: draft. See [SPEC.md](SPEC.md). The first consumer is [yubikiri](https://github.com/habakan/yubikiri).
+
+In code, `parse` reads the text and `stringify` writes it back.
+`toDocument` gives the same document as a plain object, for sending it as JSON (for example inside a Nostr event); `parse` reads that JSON too.
