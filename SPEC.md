@@ -112,7 +112,9 @@ limits:
 
 ## Validation
 
-A reader rejects the document and reports the line of the first problem when:
+Documents are read as YAML 1.2, so `Yes`, `No` and `2026-12-31T00:00:00Z` stay strings.
+A reader first checks the shape against [schema.json](schema.json), then, once the shape is valid, the rules below.
+It reports every problem it finds with its line, when:
 
 - a reference (oracle, party, event, outcome) does not exist;
 - an event is named by two contracts, or `"*"` appears twice;
