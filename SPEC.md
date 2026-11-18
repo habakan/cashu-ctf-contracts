@@ -46,11 +46,11 @@ events:
     description: |              # Markdown. This is the resolution criteria
       Resolves Yes if ...
     outcomes: [Yes, No]          # ASCII [A-Za-z0-9_-], 1-191 chars, unique ignoring case
-    labels: { Yes: はい }        # optional display names
+    labels: { Yes: Oui }         # optional display names
     maturity: 2026-12-31T00:00:00Z
 ```
 
-The key names the event inside the document and may be any string, such as `早起き`.
+The key names the event inside the document and may be any string, including non-ASCII names such as `早起き`.
 `id` is the event id the oracle announces (DLC `event_id`) and defaults to the key; two events cannot share one.
 Contracts and markets refer to events by key, and the `id` is what NUT-CTF and attestations use.
 

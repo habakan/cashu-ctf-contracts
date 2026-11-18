@@ -20,7 +20,7 @@ const errorsOf = (text: string): ParseError[] => {
   return result.errors;
 };
 const HEX = "9be6fa256a022aafc98f24a71f0e37ab2ac6fe5b208a77a3d429b4b5c59f7ce0";
-// 1 か所だけ差し替えて、その行のエラーを見る
+// Swap one spot and check the error on that line
 const base = `version: 1
 oracles:
   me: { pubkeys: [${HEX}] }
@@ -44,7 +44,7 @@ const swap = (from: string, to: string) => {
 };
 
 describe("parse", () => {
-  it("yubikiri の約束を読み、額と既定の値を埋める", () => {
+  it("reads yubikiri promises and fills amounts and defaults", () => {
     const result = parse(example("yubikiri"));
     if (!result.ok) throw new Error(JSON.stringify(result.errors));
     const doc = result.value;
@@ -63,7 +63,7 @@ describe("parse", () => {
     expect(doc.markets).toEqual([]);
   });
 
-  it("bitCaster のマーケットを読み、結果の組を結果ごとに埋める", () => {
+  it("reads a bitCaster market and fills one outcome collection per outcome", () => {
     const result = parse(example("market"));
     if (!result.ok) throw new Error(JSON.stringify(result.errors));
     expect(result.value.markets).toEqual([
@@ -73,7 +73,7 @@ describe("parse", () => {
     expect(result.value.contracts).toEqual([]);
   });
 
-  it("stringify してから読み戻すと同じ値になる", () => {
+  it("round-trips through stringify", () => {
     for (const name of ["yubikiri", "market"]) {
       const first = parse(example(name));
       if (!first.ok) throw new Error(name);
@@ -83,38 +83,38 @@ describe("parse", () => {
   });
 });
 
-describe("parse のエラー", () => {
+describe("parse errors", () => {
   const cases: [string, string, number, RegExp][] = [
-    ["知らないキー", swap("    settle: lightning", "    settle: lightning\n    memo: x"), 17, /memo/],
-    ["version が無い", base.replace("version: 1\n", ""), 1, /version/],
-    ["存在しないオラクル", swap("oracle: me", "oracle: you"), 8, /you/],
-    ["存在しない相手", swap("{ mom: 100 sat }", "{ dad: 100 sat }"), 15, /dad/],
-    ["存在しない事象", swap("- event: wake", "- event: sleep"), 14, /sleep/],
-    ["存在しない結果", swap("payout: { missed:", "payout: { late:"), 15, /late/],
-    ["半角英数字でない結果", swap("[kept, missed]", "[守った, missed]"), 12, /守った/],
-    ["大文字と小文字だけ違う結果", swap("[kept, missed]", "[kept, Kept]"), 12, /Kept/],
-    ["| を含む結果", swap("[kept, missed]", "[kept, a|b]"), 12, /a\|b/],
-    ["額の書き方", swap("100 sat", "100 sats"), 15, /100 sats/],
-    ["毎日の事象の締め", swap('"10:00 Asia/Tokyo"', "2026-11-18T10:00:00Z"), 11, /maturity/],
-    ["1 回きりの事象の締め", swap("    every: day\n", ""), 10, /maturity/],
-    ["形の合わない npub", swap(`[${HEX}]`, "[npub1nope]"), 3, /npub1nope/],
-    ["cashu-ctf に Cashu の鍵が無い相手", swap("settle: lightning", "settle: cashu-ctf"), 15, /mom/],
+    ["an unknown key", swap("    settle: lightning", "    settle: lightning\n    memo: x"), 17, /memo/],
+    ["a missing version", base.replace("version: 1\n", ""), 1, /version/],
+    ["an unknown oracle", swap("oracle: me", "oracle: you"), 8, /you/],
+    ["an unknown party", swap("{ mom: 100 sat }", "{ dad: 100 sat }"), 15, /dad/],
+    ["an unknown event", swap("- event: wake", "- event: sleep"), 14, /sleep/],
+    ["an unknown outcome", swap("payout: { missed:", "payout: { late:"), 15, /late/],
+    ["a non-ASCII outcome", swap("[kept, missed]", "[守った, missed]"), 12, /守った/],
+    ["outcomes differing only in case", swap("[kept, missed]", "[kept, Kept]"), 12, /Kept/],
+    ["an outcome with |", swap("[kept, missed]", "[kept, a|b]"), 12, /a\|b/],
+    ["a malformed amount", swap("100 sat", "100 sats"), 15, /100 sats/],
+    ["a recurring event's maturity", swap('"10:00 Asia/Tokyo"', "2026-11-18T10:00:00Z"), 11, /maturity/],
+    ["a one-off event's maturity", swap("    every: day\n", ""), 10, /maturity/],
+    ["a malformed npub", swap(`[${HEX}]`, "[npub1nope]"), 3, /npub1nope/],
+    ["a cashu-ctf party without a Cashu key", swap("settle: lightning", "settle: cashu-ctf"), 15, /mom/],
   ];
   for (const [name, text, line, message] of cases)
-    it(`${name} は ${line} 行目で断る`, () => {
+    it(`rejects ${name} at line ${line}`, () => {
       const [first] = errorsOf(text);
       expect(first?.line).toBe(line);
       expect(first?.message).toMatch(message);
     });
 
-  it("同じ事象が 2 つの契約に入るときと、* が 2 つあるときは断る", () => {
+  it("rejects an event in two contracts and a second " * "", () => {
     const twice = `${base}  - event: wake\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n`;
     expect(errorsOf(twice)[0]).toMatchObject({ line: 17, message: expect.stringMatching(/wake/) });
     const stars = `${base}  - event: "*"\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n  - event: "*"\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n`;
     expect(errorsOf(stars)[0]).toMatchObject({ line: 20, message: expect.stringMatching(/\*/) });
   });
 
-  it("max_per_day の単位が配分と違うときと、cashu-ctf で jpy を使うときは断る", () => {
+  it("rejects max_per_day in another unit and jpy with cashu-ctf", () => {
     const max = swap("    settle: lightning", "    max_per_day: 300 jpy\n    settle: lightning");
     expect(errorsOf(max)[0]).toMatchObject({ line: 16, message: expect.stringMatching(/max_per_day/) });
     const jpy = swap("mom: mom@walletofsatoshi.com", `mom: 02${HEX}`)
@@ -123,7 +123,7 @@ describe("parse のエラー", () => {
     expect(errorsOf(jpy)[0]).toMatchObject({ line: 15, message: expect.stringMatching(/jpy/) });
   });
 
-  it("間違いが複数あれば全部を行の順に返す", () => {
+  it("returns every problem in line order", () => {
     const text = swap("oracle: me", "oracle: you").replace("{ mom: 100 sat }", "{ dad: 100 sat }");
     expect(errorsOf(text).map((e) => e.line)).toEqual([8, 15]);
   });
@@ -131,7 +131,7 @@ describe("parse のエラー", () => {
 
 describe("schema.json", () => {
   const validate = new Ajv({ allErrors: true }).compile(schema);
-  it("正しい例を通し、形の間違いを断る", () => {
+  it("accepts the examples and rejects malformed shapes", () => {
     expect(validate(parseYaml(example("yubikiri")))).toBe(true);
     expect(validate(parseYaml(example("market")))).toBe(true);
     expect(validate(parseYaml(swap("100 sat", "100 sats")))).toBe(false);
@@ -142,8 +142,8 @@ describe("schema.json", () => {
 });
 
 describe("NUT-CTF", () => {
-  // 期待値は仕様の式 (BIP-340 の tagged hash) を Python の hashlib で別に計算したもの
-  it("conditionId は鍵を並べ替え、事象の id と結果の数から計算する", () => {
+  // Expected values computed separately from the spec's formula (BIP-340 tagged hash) with Python's hashlib
+  it("conditionId sorts the keys and hashes them with the event id and outcome count", () => {
     expect(conditionId([HEX], occurrenceId("wake", "2026-11-18"), 2)).toBe(
       "6a5189f144de9ce6ffdc4cd44c909626a8608d0d241850e82e90421f7ac12ff8",
     );
@@ -153,7 +153,7 @@ describe("NUT-CTF", () => {
   });
 });
 
-describe("複数の事象をまとめた契約", () => {
+describe("contracts over several events", () => {
   const two = swap(
     "contracts:",
     `  gym:
@@ -164,7 +164,7 @@ describe("複数の事象をまとめた契約", () => {
     outcomes: [kept, missed]
 contracts:`,
   );
-  it("event に一覧を書くと 1 日の上限を共有する 1 つの契約として読む", () => {
+  it("reads a list of events as one contract sharing max_per_day", () => {
     const text = two
       .replace("- event: wake", "- event: [wake, gym]")
       .replace("    settle: lightning", "    max_per_day: 210 sat\n    settle: lightning");
@@ -177,7 +177,7 @@ contracts:`,
     expect(parse(stringify(result.value))).toEqual(result);
   });
 
-  it("一覧の中の * と、ほかの契約と重なる事象は、種類のコードと名前つきで断る", () => {
+  it("rejects " * " in a list and overlapping events with a code and the name", () => {
     expect(errorsOf(two.replace("- event: wake", '- event: [wake, "*"]'))[0]).toMatchObject({
       code: "catch_all_in_list",
       subject: "*",
@@ -192,18 +192,18 @@ contracts:`,
 });
 
 describe("locate", () => {
-  it("パスの位置を返し、無いパスは近い親の位置を返す", () => {
+  it("returns the position of a path, or of its closest existing parent", () => {
     expect(locate(base, ["contracts", 0, "settle"])).toEqual({ line: 16, column: 5 });
     expect(locate(base, ["contracts", 0, "nothing"])).toEqual({ line: 14, column: 5 });
   });
 });
 
-describe("事象の id", () => {
+describe("event ids", () => {
   const named = swap("  wake:\n", "  早起き:\n    id: rtn_wake\n").replace(
     "- event: wake",
     "- event: 早起き",
   );
-  it("キーと別に id を書け、事象の id は id の方になる", () => {
+  it("takes the event id from id rather than the key", () => {
     const result = parse(named);
     if (!result.ok) throw new Error(JSON.stringify(result.errors));
     expect(result.value.events.早起き?.id).toBe("rtn_wake");
@@ -212,7 +212,7 @@ describe("事象の id", () => {
     expect(parse(stringify(result.value))).toEqual(result);
   });
 
-  it("同じ id を 2 つの事象に書くと断る", () => {
+  it("rejects two events sharing one id", () => {
     const twice = named.replace(
       "contracts:",
       `  寝坊:

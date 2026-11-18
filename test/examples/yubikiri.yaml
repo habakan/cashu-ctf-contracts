@@ -9,7 +9,7 @@ events:
   wake:
     oracle: me
     title: Up by 6:00
-    labels: { kept: 守った, missed: 破った }
+    labels: { kept: Kept it, missed: Missed it }
     every: day
     maturity: "10:00 Asia/Tokyo"
     outcomes: [kept, missed]
