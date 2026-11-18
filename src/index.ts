@@ -23,6 +23,8 @@ export interface Oracle {
   threshold: number;
 }
 export interface Event {
+  /** the event id the oracle announces; defaults to the key */
+  id?: string;
   oracle: string;
   title: string;
   description?: string;
@@ -77,6 +79,7 @@ export type ErrorCode =
   | "unknown_event"
   | "outcome_collection"
   | "duplicate_event"
+  | "duplicate_event_id"
   | "catch_all_in_list"
   | "unknown_outcome"
   | "unknown_party"
@@ -121,6 +124,9 @@ export function pubkeyHex(key: string): string | null {
     return null;
   }
 }
+
+/** The id the oracle announces for the event at key */
+export const eventIdOf = (doc: Contracts, key: string) => doc.events[key]?.id ?? key;
 
 /** Id of one occurrence of a recurring event, by the local date of the period it judges */
 export const occurrenceId = (id: string, date: string) => `${id}/${date}`;
@@ -173,7 +179,19 @@ function references(raw: Raw): Problem[] {
         ),
       );
   }
+  const ids = new Map<string, string>();
   for (const [id, event] of Object.entries(events)) {
+    const announced = event.id ?? id;
+    if (ids.has(announced))
+      problems.push(
+        problem(
+          event.id ? ["events", id, "id"] : ["events", id],
+          "duplicate_event_id",
+          announced,
+          `event id "${announced}" is also used by "${ids.get(announced)}"`,
+        ),
+      );
+    ids.set(announced, id);
     if (!raw.oracles?.[event.oracle])
       problems.push(
         problem(["events", id, "oracle"], "unknown_oracle", event.oracle, `unknown oracle "${event.oracle}"`),

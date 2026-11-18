@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
 import {
   conditionId,
+  eventIdOf,
   locate,
   occurrenceId,
   type ParseError,
@@ -194,5 +195,35 @@ describe("locate", () => {
   it("パスの位置を返し、無いパスは近い親の位置を返す", () => {
     expect(locate(base, ["contracts", 0, "settle"])).toEqual({ line: 16, column: 5 });
     expect(locate(base, ["contracts", 0, "nothing"])).toEqual({ line: 14, column: 5 });
+  });
+});
+
+describe("事象の id", () => {
+  const named = swap("  wake:\n", "  早起き:\n    id: rtn_wake\n").replace(
+    "- event: wake",
+    "- event: 早起き",
+  );
+  it("キーと別に id を書け、事象の id は id の方になる", () => {
+    const result = parse(named);
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.value.events.早起き?.id).toBe("rtn_wake");
+    expect(eventIdOf(result.value, "早起き")).toBe("rtn_wake");
+    expect(eventIdOf(result.value, "wake")).toBe("wake");
+    expect(parse(stringify(result.value))).toEqual(result);
+  });
+
+  it("同じ id を 2 つの事象に書くと断る", () => {
+    const twice = named.replace(
+      "contracts:",
+      `  寝坊:
+    id: rtn_wake
+    oracle: me
+    title: Late
+    every: day
+    maturity: "10:00 Asia/Tokyo"
+    outcomes: [kept, missed]
+contracts:`,
+    );
+    expect(errorsOf(twice)[0]).toMatchObject({ code: "duplicate_event_id", subject: "rtn_wake", line: 15 });
   });
 });

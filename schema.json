@@ -44,6 +44,10 @@
         "additionalProperties": false,
         "required": ["oracle", "title", "outcomes", "maturity"],
         "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
           "oracle": {
             "type": "string"
           },

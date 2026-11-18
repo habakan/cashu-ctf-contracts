@@ -50,6 +50,10 @@ events:
     maturity: 2026-12-31T00:00:00Z
 ```
 
+The key names the event inside the document and may be any string, such as `早起き`.
+`id` is the event id the oracle announces (DLC `event_id`) and defaults to the key; two events cannot share one.
+Contracts and markets refer to events by key, and the `id` is what NUT-CTF and attestations use.
+
 Outcome ids are restricted to ASCII so that they survive NUT-CTF outcome collections (`|`-joined, `*` reserved) and bitCaster's naming rule.
 
 A recurring event adds `every` and gives `maturity` as a local time:
@@ -125,7 +129,7 @@ It reports every problem it finds with its line, a stable `code` (such as `unkno
 
 ## Mapping to NUT-CTF
 
-- `condition_id = tagged_hash("Cashu_condition_id", sorted_oracle_pubkeys || event_id || outcome_count)`, where `event_id` is the event id above (with the date suffix for recurring events).
+- `condition_id = tagged_hash("Cashu_condition_id", sorted_oracle_pubkeys || event_id || outcome_count)`, where `event_id` is the event's `id` (or key), with the date suffix for recurring events.
 - The oracle publishes DLC announcements (nonces committed) before maturity and attestations after. Nostr transport (NIP-88, kinds 88/89) is recommended.
 
 ## Out of scope for v1
