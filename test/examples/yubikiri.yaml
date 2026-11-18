@@ -1,0 +1,34 @@
+version: 1
+oracles:
+  me: { pubkeys: [npub1n0n05ft2qg42ljv0yjn37r3h4v4vdljmyz980g759x6tt3vl0nsqvyu64p] }
+parties:
+  mom: mom@walletofsatoshi.com
+  friend: friend@walletofsatoshi.com
+  opensats: donate@opensats.org
+events:
+  wake:
+    oracle: me
+    title: Up by 6:00
+    labels: { kept: 守った, missed: 破った }
+    every: day
+    maturity: "10:00 Asia/Tokyo"
+    outcomes: [kept, missed]
+  steps:
+    oracle: me
+    title: 8000 steps
+    every: day
+    maturity: "10:00 Asia/Tokyo"
+    outcomes: [kept, missed]
+contracts:
+  - event: wake
+    payout: { missed: { mom: 100 sat } }
+    settle: lightning
+  - event: steps
+    payout: { missed: { friend: 14 sat, opensats: 7 sat } }
+    max_per_day: 210 sat
+    settle: lightning
+  - event: "*"
+    payout: { missed: { opensats: 50 jpy } }
+    settle: lightning
+limits:
+  per_day: 500 sat

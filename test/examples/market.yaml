@@ -1,0 +1,19 @@
+version: 1
+oracles:
+  me:
+    pubkeys:
+      - 9be6fa256a022aafc98f24a71f0e37ab2ac6fe5b208a77a3d429b4b5c59f7ce0
+      - 1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f
+    threshold: 2
+events:
+  btc-100k:
+    oracle: me
+    title: BTC above $100k at the end of 2026?
+    description: |
+      Resolves Yes if the Bitstamp BTC/USD close on 2026-12-31 is above 100,000.
+    outcomes: [Yes, No]
+    maturity: 2026-12-31T00:00:00Z
+markets:
+  - event: btc-100k
+    mint: https://mint.example
+    unit: sat
