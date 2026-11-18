@@ -32,6 +32,8 @@ export interface Event {
   labels?: Record<string, string>;
   maturity: string;
   every?: string;
+  /** how the oracle decides the outcome; its shape is up to the oracle */
+  rule?: Record<string, unknown>;
 }
 export interface Market {
   event: string;

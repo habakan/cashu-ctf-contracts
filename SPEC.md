@@ -69,6 +69,19 @@ A recurring event adds `every` and gives `maturity` as a local time:
 
 Each occurrence is its own event with id `<id>/<YYYY-MM-DD>` (the local date of the period it judges).
 
+`rule` is an optional object saying how the oracle decides the outcome, for oracles that judge by a machine-readable rule rather than by the description.
+Its shape belongs to the oracle; this format only requires an object and does not read it.
+
+```yaml
+  steps:
+    oracle: judge
+    title: Walk 6,000 steps
+    every: day
+    maturity: "10:00 Asia/Tokyo"
+    outcomes: [kept, missed]
+    rule: { metric: steps, at_least: 6000 }
+```
+
 ### Market
 
 ```yaml

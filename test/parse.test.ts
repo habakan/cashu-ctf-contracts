@@ -83,6 +83,19 @@ describe("parse", () => {
     }
   });
 
+  it("keeps an oracle's rule as given and rejects a rule that is not an object", () => {
+    const rule = swap(
+      "outcomes: [kept, missed]",
+      "outcomes: [kept, missed]\n    rule: { metric: steps, at_least: 6000 }",
+    );
+    const result = parse(rule);
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.value.events.wake?.rule).toEqual({ metric: "steps", at_least: 6000 });
+    expect(
+      errorsOf(swap("outcomes: [kept, missed]", "outcomes: [kept, missed]\n    rule: steps"))[0]?.code,
+    ).toBe("shape");
+  });
+
   it("reads the JSON of toDocument back to the same value", () => {
     for (const name of ["yubikiri", "market"]) {
       const first = parse(example(name));
