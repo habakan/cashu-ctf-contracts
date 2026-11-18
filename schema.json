@@ -6,7 +6,9 @@
   "additionalProperties": false,
   "required": ["version"],
   "properties": {
-    "version": { "const": 1 },
+    "version": {
+      "const": 1
+    },
     "oracles": {
       "type": "object",
       "additionalProperties": {
@@ -14,14 +16,26 @@
         "additionalProperties": false,
         "required": ["pubkeys"],
         "properties": {
-          "pubkeys": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/pubkey" } },
-          "threshold": { "type": "integer", "minimum": 1 }
+          "pubkeys": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/definitions/pubkey"
+            }
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },
     "parties": {
       "type": "object",
-      "additionalProperties": { "type": "string", "minLength": 1 }
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "events": {
       "type": "object",
@@ -30,13 +44,36 @@
         "additionalProperties": false,
         "required": ["oracle", "title", "outcomes", "maturity"],
         "properties": {
-          "oracle": { "type": "string" },
-          "title": { "type": "string", "minLength": 1 },
-          "description": { "type": "string" },
-          "outcomes": { "type": "array", "minItems": 2, "items": { "$ref": "#/definitions/outcome" } },
-          "labels": { "type": "object", "additionalProperties": { "type": "string" } },
-          "maturity": { "type": "string" },
-          "every": { "type": "string", "pattern": "^(day|week|(RRULE:)?FREQ=[A-Z]+(;[A-Z]+=[^;]+)*)$" }
+          "oracle": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "$ref": "#/definitions/outcome"
+            }
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "maturity": {
+            "type": "string"
+          },
+          "every": {
+            "type": "string",
+            "pattern": "^(day|week|(RRULE:)?FREQ=[A-Z]+(;[A-Z]+=[^;]+)*)$"
+          }
         }
       }
     },
@@ -47,13 +84,23 @@
         "additionalProperties": false,
         "required": ["event", "mint", "unit"],
         "properties": {
-          "event": { "type": "string" },
-          "mint": { "type": "string", "pattern": "^https?://" },
-          "unit": { "enum": ["sat", "msat"] },
+          "event": {
+            "type": "string"
+          },
+          "mint": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "unit": {
+            "enum": ["sat", "msat"]
+          },
           "outcome_collections": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,191}(\\|[A-Za-z0-9_-]{1,191})*$" }
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,191}(\\|[A-Za-z0-9_-]{1,191})*$"
+            }
           }
         }
       }
@@ -65,28 +112,61 @@
         "additionalProperties": false,
         "required": ["event", "payout", "settle"],
         "properties": {
-          "event": { "type": "string" },
+          "event": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "uniqueItems": true
+              }
+            ]
+          },
           "payout": {
             "type": "object",
             "additionalProperties": {
               "type": "object",
-              "additionalProperties": { "$ref": "#/definitions/amount" }
+              "additionalProperties": {
+                "$ref": "#/definitions/amount"
+              }
             }
           },
-          "max_per_day": { "$ref": "#/definitions/amount" },
-          "settle": { "enum": ["lightning", "cashu-ctf"] }
+          "max_per_day": {
+            "$ref": "#/definitions/amount"
+          },
+          "settle": {
+            "enum": ["lightning", "cashu-ctf"]
+          }
         }
       }
     },
     "limits": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "per_day": { "$ref": "#/definitions/amount" } }
+      "properties": {
+        "per_day": {
+          "$ref": "#/definitions/amount"
+        }
+      }
     }
   },
   "definitions": {
-    "amount": { "type": "string", "pattern": "^[1-9][0-9]* (sat|msat|jpy)$" },
-    "outcome": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,191}$" },
-    "pubkey": { "type": "string", "pattern": "^(npub1[02-9ac-hj-np-z]{58}|[0-9a-f]{64})$" }
+    "amount": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]* (sat|msat|jpy)$"
+    },
+    "outcome": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,191}$"
+    },
+    "pubkey": {
+      "type": "string",
+      "pattern": "^(npub1[02-9ac-hj-np-z]{58}|[0-9a-f]{64})$"
+    }
   }
 }

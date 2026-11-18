@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A YAML format for oracle-settled markets and contracts on bitcoin (DLC oracles, Cashu NUT-CTF, Lightning)",
+  "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
     "./schema.json": "./schema.json"

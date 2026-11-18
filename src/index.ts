@@ -38,7 +38,8 @@ export interface Market {
   outcome_collections: string[];
 }
 export interface Contract {
-  event: string;
+  /** one event, several events sharing max_per_day, or "*" for events no other contract names */
+  event: string | string[];
   payout: Record<string, Record<string, Amount>>;
   max_per_day?: Amount;
   settle: "lightning" | "cashu-ctf";
@@ -58,8 +59,30 @@ export interface ParseError {
   column: number;
   /** where in the document, such as "contracts.0.payout" */
   path: string;
+  code: ErrorCode;
+  /** the name or value at fault, for messages in other languages */
+  subject: string;
   message: string;
 }
+export type ErrorCode =
+  | "yaml"
+  | "shape"
+  | "unknown_key"
+  | "missing"
+  | "invalid_pubkey"
+  | "threshold"
+  | "unknown_oracle"
+  | "duplicate_outcome"
+  | "maturity"
+  | "unknown_event"
+  | "outcome_collection"
+  | "duplicate_event"
+  | "catch_all_in_list"
+  | "unknown_outcome"
+  | "unknown_party"
+  | "needs_cashu_key"
+  | "cashu_jpy"
+  | "max_unit";
 export type ParseResult = { ok: true; value: Contracts } | { ok: false; errors: ParseError[] };
 
 type Path = (string | number)[];
@@ -114,92 +137,168 @@ export function conditionId(pubkeys: string[], eventId: string, outcomeCount: nu
   return bytesToHex(sha256(concatBytes(tag, tag, msg)));
 }
 
-function references(raw: Raw): [Path, string][] {
-  const problems: [Path, string][] = [];
+interface Problem {
+  path: Path;
+  code: ErrorCode;
+  /** the name or value at fault, for messages in other languages */
+  subject: string;
+  message: string;
+}
+const problem = (path: Path, code: ErrorCode, subject: string, message: string): Problem => ({
+  path,
+  code,
+  subject,
+  message,
+});
+const eventsOf = (c: { event: string | string[] }) => (Array.isArray(c.event) ? c.event : [c.event]);
+
+function references(raw: Raw): Problem[] {
+  const problems: Problem[] = [];
   const events = raw.events ?? {};
   const parties = raw.parties ?? {};
   for (const [name, oracle] of Object.entries(raw.oracles ?? {})) {
     oracle.pubkeys.forEach((k, i) => {
-      if (!pubkeyHex(k)) problems.push([["oracles", name, "pubkeys", i], `not a valid public key: ${k}`]);
+      if (!pubkeyHex(k))
+        problems.push(
+          problem(["oracles", name, "pubkeys", i], "invalid_pubkey", k, `not a valid public key: ${k}`),
+        );
     });
     if ((oracle.threshold ?? 1) > oracle.pubkeys.length)
-      problems.push([["oracles", name, "threshold"], `threshold is larger than the number of keys`]);
+      problems.push(
+        problem(
+          ["oracles", name, "threshold"],
+          "threshold",
+          name,
+          "threshold is larger than the number of keys",
+        ),
+      );
   }
   for (const [id, event] of Object.entries(events)) {
     if (!raw.oracles?.[event.oracle])
-      problems.push([["events", id, "oracle"], `unknown oracle "${event.oracle}"`]);
+      problems.push(
+        problem(["events", id, "oracle"], "unknown_oracle", event.oracle, `unknown oracle "${event.oracle}"`),
+      );
     const seen = new Set<string>();
     event.outcomes.forEach((o, i) => {
       if (seen.has(o.toLowerCase()))
-        problems.push([["events", id, "outcomes", i], `outcome "${o}" repeats another ignoring case`]);
+        problems.push(
+          problem(
+            ["events", id, "outcomes", i],
+            "duplicate_outcome",
+            o,
+            `outcome "${o}" repeats another ignoring case`,
+          ),
+        );
       seen.add(o.toLowerCase());
     });
-    const pattern = event.every ? LOCAL_TIME : INSTANT;
-    if (!pattern.test(event.maturity))
-      problems.push([
-        ["events", id, "maturity"],
-        `maturity "${event.maturity}" must be ${event.every ? 'a local time like "10:00 Asia/Tokyo"' : "an RFC 3339 time"}`,
-      ]);
+    if (!(event.every ? LOCAL_TIME : INSTANT).test(event.maturity))
+      problems.push(
+        problem(
+          ["events", id, "maturity"],
+          "maturity",
+          event.maturity,
+          `maturity "${event.maturity}" must be ${event.every ? 'a local time like "10:00 Asia/Tokyo"' : "an RFC 3339 time"}`,
+        ),
+      );
   }
   (raw.markets ?? []).forEach((m, i) => {
     const event = events[m.event];
     if (!event) {
-      problems.push([["markets", i, "event"], `unknown event "${m.event}"`]);
+      problems.push(problem(["markets", i, "event"], "unknown_event", m.event, `unknown event "${m.event}"`));
       return;
     }
     (m.outcome_collections ?? []).forEach((c, j) => {
       const parts = c.split("|");
       if (parts.some((p) => !event.outcomes.includes(p)) || parts.length >= event.outcomes.length)
-        problems.push([
-          ["markets", i, "outcome_collections", j],
-          `"${c}" is not a proper subset of the outcomes`,
-        ]);
+        problems.push(
+          problem(
+            ["markets", i, "outcome_collections", j],
+            "outcome_collection",
+            c,
+            `"${c}" is not a proper subset of the outcomes`,
+          ),
+        );
     });
   });
   const named = new Set<string>();
   (raw.contracts ?? []).forEach((c, i) => {
-    if (named.has(c.event))
-      problems.push([["contracts", i, "event"], `event "${c.event}" is already in another contract`]);
-    named.add(c.event);
-    const event = c.event === "*" ? undefined : events[c.event];
-    if (c.event !== "*" && !event) problems.push([["contracts", i, "event"], `unknown event "${c.event}"`]);
+    const ids = eventsOf(c);
+    const at = (j: number): Path =>
+      Array.isArray(c.event) ? ["contracts", i, "event", j] : ["contracts", i, "event"];
+    ids.forEach((id, j) => {
+      if (named.has(id))
+        problems.push(problem(at(j), "duplicate_event", id, `event "${id}" is already in another contract`));
+      named.add(id);
+      if (id === "*" && ids.length > 1)
+        problems.push(problem(at(j), "catch_all_in_list", id, `"*" cannot be listed with other events`));
+      else if (id !== "*" && !events[id])
+        problems.push(problem(at(j), "unknown_event", id, `unknown event "${id}"`));
+    });
     const units = new Set<string>();
     for (const [outcome, pays] of Object.entries(c.payout)) {
-      if (event && !event.outcomes.includes(outcome))
-        problems.push([
-          ["contracts", i, "payout", outcome],
-          `event "${c.event}" has no outcome "${outcome}"`,
-        ]);
+      const lacking = ids.find((id) => events[id] && !events[id].outcomes.includes(outcome));
+      if (lacking)
+        problems.push(
+          problem(
+            ["contracts", i, "payout", outcome],
+            "unknown_outcome",
+            outcome,
+            `event "${lacking}" has no outcome "${outcome}"`,
+          ),
+        );
       for (const [party, amount] of Object.entries(pays)) {
-        const at: Path = ["contracts", i, "payout", outcome, party];
+        const where: Path = ["contracts", i, "payout", outcome, party];
         units.add(amountOf(amount).unit);
-        if (!(party in parties)) problems.push([at, `unknown party "${party}"`]);
+        if (!(party in parties))
+          problems.push(problem(where, "unknown_party", party, `unknown party "${party}"`));
         else if (c.settle === "cashu-ctf" && !CASHU_KEY.test(parties[party] as string))
-          problems.push([at, `party "${party}" needs a Cashu key (02.../03...) for cashu-ctf`]);
+          problems.push(
+            problem(
+              where,
+              "needs_cashu_key",
+              party,
+              `party "${party}" needs a Cashu key (02.../03...) for cashu-ctf`,
+            ),
+          );
         if (c.settle === "cashu-ctf" && amountOf(amount).unit === "jpy")
-          problems.push([at, "cashu-ctf cannot pay a jpy amount"]);
+          problems.push(problem(where, "cashu_jpy", amount, "cashu-ctf cannot pay a jpy amount"));
       }
     }
     if (c.max_per_day && (units.size !== 1 || !units.has(amountOf(c.max_per_day).unit)))
-      problems.push([["contracts", i, "max_per_day"], "max_per_day must use the same unit as the payouts"]);
+      problems.push(
+        problem(
+          ["contracts", i, "max_per_day"],
+          "max_unit",
+          c.max_per_day,
+          "max_per_day must use the same unit as the payouts",
+        ),
+      );
   });
   return problems;
 }
 
-function schemaProblem(e: ErrorObject): [Path, string] {
+function schemaProblem(e: ErrorObject): Problem {
   const path: Path = e.instancePath
     .split("/")
     .slice(1)
     .map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
   if (e.keyword === "additionalProperties")
-    return [[...path, e.params.additionalProperty], `unknown key "${e.params.additionalProperty}"`];
-  if (e.keyword === "required") return [path, `missing "${e.params.missingProperty}"`];
+    return problem(
+      [...path, e.params.additionalProperty],
+      "unknown_key",
+      e.params.additionalProperty,
+      `unknown key "${e.params.additionalProperty}"`,
+    );
+  if (e.keyword === "required")
+    return problem(path, "missing", e.params.missingProperty, `missing "${e.params.missingProperty}"`);
   const where = path.join(".") || "document";
-  const got =
-    e.keyword === "pattern" || e.keyword === "enum" || e.keyword === "const"
-      ? ` (got ${JSON.stringify(e.data)})`
-      : "";
-  return [path, `${where} ${e.message}${got}`];
+  const shown = e.keyword === "pattern" || e.keyword === "enum" || e.keyword === "const";
+  return problem(
+    path,
+    "shape",
+    shown ? String(e.data) : where,
+    `${where} ${e.message}${shown ? ` (got ${JSON.stringify(e.data)})` : ""}`,
+  );
 }
 
 export function parse(text: string): ParseResult {
@@ -210,7 +309,7 @@ export function parse(text: string): ParseResult {
       ok: false,
       errors: doc.errors.map((e) => {
         const pos = lines.linePos(e.pos[0]);
-        return { line: pos.line, column: pos.col, path: "", message: e.message };
+        return { line: pos.line, column: pos.col, path: "", code: "yaml", subject: "", message: e.message };
       }),
     };
   const raw = doc.toJS() as Raw;
@@ -220,9 +319,9 @@ export function parse(text: string): ParseResult {
         schemaProblem({ ...e, data: e.data ?? dataAt(raw, e.instancePath) }),
       );
   if (problems.length > 0) {
-    const errors = problems.map(([path, message]) => {
+    const errors = problems.map(({ path, ...rest }) => {
       const pos = lines.linePos(offsetOf(doc, path));
-      return { line: pos.line, column: pos.col, path: path.join("."), message };
+      return { line: pos.line, column: pos.col, path: path.join("."), ...rest };
     });
     return { ok: false, errors: errors.sort((a, b) => a.line - b.line || a.column - b.column) };
   }

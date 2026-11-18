@@ -93,6 +93,7 @@ contracts:
     settle: lightning
 ```
 
+- `event` is one event id, a list of ids (`[steps, gym]`) that share one contract and its `max_per_day`, or `"*"` alone.
 - `payout` maps an outcome to `{party: amount}`. Outcomes not listed pay nothing.
 - `settle`:
   - `lightning`: after the attestation, the payer's wallet pays each party. Works with any wallet; nothing is locked in advance, so it relies on the payer's software running.
@@ -114,7 +115,7 @@ limits:
 
 Documents are read as YAML 1.2, so `Yes`, `No` and `2026-12-31T00:00:00Z` stay strings.
 A reader first checks the shape against [schema.json](schema.json), then, once the shape is valid, the rules below.
-It reports every problem it finds with its line, when:
+It reports every problem it finds with its line, a stable `code` (such as `unknown_party`) and the offending name, so applications can word the message in their own language. Problems include:
 
 - a reference (oracle, party, event, outcome) does not exist;
 - an event is named by two contracts, or `"*"` appears twice;

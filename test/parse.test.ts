@@ -143,3 +143,41 @@ describe("NUT-CTF", () => {
     );
   });
 });
+
+describe("複数の事象をまとめた契約", () => {
+  const two = swap(
+    "contracts:",
+    `  gym:
+    oracle: me
+    title: Gym
+    every: day
+    maturity: "10:00 Asia/Tokyo"
+    outcomes: [kept, missed]
+contracts:`,
+  );
+  it("event に一覧を書くと 1 日の上限を共有する 1 つの契約として読む", () => {
+    const text = two
+      .replace("- event: wake", "- event: [wake, gym]")
+      .replace("    settle: lightning", "    max_per_day: 210 sat\n    settle: lightning");
+    const result = parse(text);
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.value.contracts[0]).toMatchObject({
+      event: ["wake", "gym"],
+      max_per_day: { amount: 210, unit: "sat" },
+    });
+    expect(parse(stringify(result.value))).toEqual(result);
+  });
+
+  it("一覧の中の * と、ほかの契約と重なる事象は、種類のコードと名前つきで断る", () => {
+    expect(errorsOf(two.replace("- event: wake", '- event: [wake, "*"]'))[0]).toMatchObject({
+      code: "catch_all_in_list",
+      subject: "*",
+    });
+    const overlap = `${two.replace("- event: wake", "- event: [wake, gym]")}  - event: gym\n    payout: { missed: { mom: 1 sat } }\n    settle: lightning\n`;
+    expect(errorsOf(overlap)[0]).toMatchObject({ code: "duplicate_event", subject: "gym", line: 23 });
+    expect(errorsOf(swap("{ mom: 100 sat }", "{ dad: 100 sat }"))[0]).toMatchObject({
+      code: "unknown_party",
+      subject: "dad",
+    });
+  });
+});
